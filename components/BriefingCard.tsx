@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Check, Copy } from './Icons';
+import { Check, Copy, Globe } from './Icons';
+import { BriefingData } from '../services/geminiService';
 
 // A lightweight markdown parser
 const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -56,11 +57,12 @@ const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
 };
 
 
-const BriefingCard: React.FC<{ content: string }> = ({ content }) => {
+const BriefingCard: React.FC<{ data: BriefingData }> = ({ data }) => {
+  const { text, sources } = data;
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(content);
+    navigator.clipboard.writeText(text);
     setCopied(true);
   };
 
@@ -84,8 +86,32 @@ const BriefingCard: React.FC<{ content: string }> = ({ content }) => {
       </button>
       
       <div className="prose prose-invert max-w-none prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline">
-         <SimpleMarkdown text={content} />
+         <SimpleMarkdown text={text} />
       </div>
+
+      {sources && sources.length > 0 && (
+        <div className="mt-8 pt-6 border-t border-gray-700">
+          <div className="flex items-center mb-3 text-indigo-300">
+            <Globe className="h-5 w-5 mr-2" />
+            <h4 className="font-semibold text-sm uppercase tracking-wider">Verified Sources</h4>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+             {sources.map((source, idx) => (
+               <a 
+                 key={idx} 
+                 href={source.url} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="text-xs text-gray-400 hover:text-indigo-400 truncate flex items-center transition-colors"
+                 title={source.title}
+               >
+                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-2 flex-shrink-0"></span>
+                 {source.title}
+               </a>
+             ))}
+          </div>
+        </div>
+      )}
 
        <style>{`
         @keyframes fade-in {

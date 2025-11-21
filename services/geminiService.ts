@@ -9,7 +9,12 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-const getBriefingPrompt = () => {
+export interface BriefingData {
+  text: string;
+  sources: { title: string; url: string }[];
+}
+
+const getBriefingPrompt = (rssContext: string) => {
   const today = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -17,53 +22,76 @@ const getBriefingPrompt = () => {
   });
 
   return `
+Current Date: ${today}
+
+Task: Generate a daily briefing email about the latest Large Language Model (LLM) and AI trends.
+You MUST use the Google Search tool to find real, up-to-date information.
+
+${rssContext}
+
+Step 1: Search for "trending github AI repositories this week" and "latest trending LLM open source projects".
+Step 2: Search for "Hugging Face trending models papers ${today}" or recent days.
+Step 3: Search for "latest AI LLM news ${today}".
+Step 4: Review the provided RSS FEED content (if any) and integrate the most interesting articles.
+
+Step 5: Compile the results into the following Markdown format:
+
 Subject: Your LLM Daily Briefing - ${today}
 
 Hi there,
 
-Here is your daily briefing on the most significant and trending topics in the world of Large Language Models (LLM) for today.
-
----
+Here are the latest updates from the world of AI.
 
 ### 🚀 Top Trending GitHub Repositories
+(List 3-5 REAL repositories found in search. Ensure links start with https://github.com/. If exact "today" trends are unclear, use "this week".)
+- [Repo Name](https://github.com/...) - Description
 
-*Instructions: Find 3-5 of the most popular or rapidly gaining traction LLM-related repositories on GitHub today. For each, provide its name, a link, and a concise one-sentence description.*
-- [Repo Name](link) - Brief, one-sentence description of what it does.
-- [Repo Name](link) - Brief, one-sentence description of what it does.
-- [Repo Name](link) - Brief, one-sentence description of what it does.
+### 🤗 Hugging Face Highlights
+(List 3-5 REAL models or papers. Ensure links start with https://huggingface.co/.)
+- [Name](https://huggingface.co/...) - Description
 
-### 🤗 Hugging Face Highlights (Models & Papers)
-
-*Instructions: Identify 3-5 trending or newly released models, datasets, or papers on Hugging Face that are generating buzz. Explain their significance briefly.*
-- [Model/Paper Name](link) - Briefly explain its significance or what's new.
-- [Model/Paper Name](link) - Briefly explain its significance or what's new.
-- [Model/Paper Name](link) - Briefly explain its significance or what's new.
-
-### 📰 Must-Read Articles & Blog Posts
-
-*Instructions: Discover 3-5 insightful and recent articles or blog posts about LLMs from top AI labs, researchers, or tech publications. Provide the title, link, author/publication, and a key takeaway.*
-- [Article Title](link) - Author/Publication - Key takeaway in one sentence.
-- [Article Title](link) - Author/Publication - Key takeaway in one sentence.
-- [Article Title](link) - Author/Publication - Key takeaway in one sentence.
+### 📰 Must-Read Articles & Feed Highlights
+(List 3-5 REAL articles from Google Search OR the RSS feeds provided above.)
+- [Title](URL) - Source - Summary
 
 ---
-
 Best,
 Your AI Assistant
   `;
 };
 
-export const generateBriefing = async (): Promise<string> => {
+export const generateBriefing = async (rssContext: string = ''): Promise<BriefingData> => {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: getBriefingPrompt(),
+      contents: getBriefingPrompt(rssContext),
       config: {
-        systemInstruction: `You are an expert AI researcher and content curator. Your task is to generate a concise daily briefing on the most significant and trending topics in the world of Large Language Models (LLM) for today. You must follow the format and instructions provided in the user's prompt exactly. The output must be in Markdown format, suitable for an email. Ensure all links are functional and the information is as current as possible.`
+        tools: [{ googleSearch: {} }],
+        systemInstruction: `You are an expert AI researcher. Your goal is to provide a factual, sourced daily briefing.
+        CRITICAL:
+        1. Verify every URL. Do not guess URLs.
+        2. For GitHub, only include repositories that are actually trending or highly active recently.
+        3. If search results are sparse for "today", look for "this week".
+        4. Prioritize quality content from the user's RSS feeds in the Articles section if available.
+        5. The output must be valid Markdown.`
       }
     });
 
-    return response.text;
+    const text = response.text || "No content generated.";
+    
+    const sources: { title: string; url: string }[] = [];
+    if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+      response.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
+        if (chunk.web) {
+          sources.push({
+            title: chunk.web.title || "Source",
+            url: chunk.web.uri || "#"
+          });
+        }
+      });
+    }
+
+    return { text, sources };
   } catch (error) {
     console.error("Error generating briefing from Gemini:", error);
     throw new Error("Failed to communicate with the Gemini API.");
