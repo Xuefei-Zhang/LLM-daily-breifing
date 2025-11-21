@@ -1,0 +1,5 @@
+{
+  "name": "LLM Daily Briefing",
+  "description": "An application that uses Gemini to generate a daily briefing of the hottest LLM-related blogs, GitHub repositories, and Hugging Face trends, formatted as an email.",
+  "requestFramePermissions": []
+}
